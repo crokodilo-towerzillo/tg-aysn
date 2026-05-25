@@ -78,14 +78,16 @@ async def cb_period_again(call: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith("period:this:"))
-async def cb_period_this(call: CallbackQuery):
+async def cb_period_this(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     key_id = int(call.data.split(":")[2])
     m_from, m_to = _this_month()
     await _show_result(call, key_id, m_from, m_to)
 
 
 @router.callback_query(F.data.startswith("period:prev:"))
-async def cb_period_prev(call: CallbackQuery):
+async def cb_period_prev(call: CallbackQuery, state: FSMContext):
+    await state.clear()
     key_id = int(call.data.split(":")[2])
     m_from, m_to = _last_month()
     await _show_result(call, key_id, m_from, m_to)
