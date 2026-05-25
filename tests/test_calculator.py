@@ -143,11 +143,11 @@ async def test_sync_reports_saves_data(tmp_db):
     key_id = db.add_key(1, "Shop", "tok")
     wb_response = [
         {
-            "realizationreportId": 101,
+            "reportId": 101,
             "dateFrom": "2026-01-01",
-            "rr_dt": "2026-01-07",
+            "dateTo": "2026-01-07",
             "reportType": 1,
-            "retailAmountSum": "10000.50",
+            "retailAmountSum": 10000.50,
         }
     ]
     mock_resp = MagicMock()

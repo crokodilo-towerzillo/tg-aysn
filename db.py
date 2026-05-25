@@ -60,8 +60,12 @@ def get_keys(user_id: int) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def get_key(key_id: int) -> sqlite3.Row | None:
+def get_key(key_id: int, user_id: int | None = None) -> sqlite3.Row | None:
     with get_conn() as conn:
+        if user_id is not None:
+            return conn.execute(
+                "SELECT * FROM api_keys WHERE id = ? AND user_id = ?", (key_id, user_id)
+            ).fetchone()
         return conn.execute(
             "SELECT * FROM api_keys WHERE id = ?", (key_id,)
         ).fetchone()

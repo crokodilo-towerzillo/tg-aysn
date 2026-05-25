@@ -172,7 +172,7 @@ async def cb_delete_key_start(call: CallbackQuery):
 @router.callback_query(F.data.startswith("delete_select:"))
 async def cb_delete_select(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
-    row = db.get_key(key_id)
+    row = db.get_key(key_id, user_id=call.message.chat.id)
     if row is None:
         await call.answer("Магазин не найден")
         return
@@ -186,8 +186,8 @@ async def cb_delete_select(call: CallbackQuery):
 @router.callback_query(F.data.startswith("delete_confirm:"))
 async def cb_delete_confirm(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
-    row = db.get_key(key_id)
-    if row is None or row["user_id"] != call.message.chat.id:
+    row = db.get_key(key_id, user_id=call.message.chat.id)
+    if row is None:
         await call.answer("Магазин не найден")
         return
     label = row["label"]

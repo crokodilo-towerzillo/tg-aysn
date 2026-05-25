@@ -28,7 +28,8 @@ async def _show_result(
     month_from: tuple[int, int],
     month_to: tuple[int, int],
 ):
-    row = db.get_key(key_id)
+    user_id = target.message.chat.id if isinstance(target, CallbackQuery) else target.chat.id
+    row = db.get_key(key_id, user_id=user_id)
     if row is None:
         text = "Магазин не найден."
         kb = keyboards.cancel_keyboard()
@@ -55,6 +56,9 @@ async def _show_result(
 @router.callback_query(F.data.startswith("calc:"))
 async def cb_calc_select(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
+    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+        await call.answer("Магазин не найден", show_alert=True)
+        return
     await call.message.edit_text(
         "Выберите период:", reply_markup=keyboards.period_keyboard(key_id)
     )
@@ -64,6 +68,9 @@ async def cb_calc_select(call: CallbackQuery):
 @router.callback_query(F.data.startswith("period_again:"))
 async def cb_period_again(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
+    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+        await call.answer("Магазин не найден", show_alert=True)
+        return
     await call.message.edit_text(
         "Выберите период:", reply_markup=keyboards.period_keyboard(key_id)
     )
@@ -89,6 +96,9 @@ async def cb_period_prev(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("period:custom:"))
 async def cb_period_custom_start(call: CallbackQuery):
     key_id = int(call.data.split(":")[2])
+    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+        await call.answer("Магазин не найден", show_alert=True)
+        return
     await call.message.edit_text(
         "Выберите начало периода:", reply_markup=keyboards.custom_from_keyboard(key_id)
     )
@@ -99,6 +109,9 @@ async def cb_period_custom_start(call: CallbackQuery):
 async def cb_custom_from(call: CallbackQuery):
     _, key_id, y, m = call.data.split(":")
     key_id, y, m = int(key_id), int(y), int(m)
+    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+        await call.answer("Магазин не найден", show_alert=True)
+        return
     await call.message.edit_text(
         "Выберите конец периода:", reply_markup=keyboards.custom_to_keyboard(key_id, y, m)
     )
@@ -118,6 +131,9 @@ async def cb_custom_to(call: CallbackQuery, state: FSMContext):
 async def cb_custom_year_from(call: CallbackQuery):
     parts = call.data.split(":")
     key_id, year = int(parts[1]), int(parts[2])
+    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+        await call.answer("Магазин не найден", show_alert=True)
+        return
     await call.message.edit_reply_markup(reply_markup=keyboards.custom_from_keyboard(key_id, year))
     await call.answer()
 
@@ -126,6 +142,9 @@ async def cb_custom_year_from(call: CallbackQuery):
 async def cb_custom_year_to(call: CallbackQuery):
     parts = call.data.split(":")
     key_id, from_y, from_m, year = int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4])
+    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+        await call.answer("Магазин не найден", show_alert=True)
+        return
     await call.message.edit_reply_markup(reply_markup=keyboards.custom_to_keyboard(key_id, from_y, from_m, year))
     await call.answer()
 
