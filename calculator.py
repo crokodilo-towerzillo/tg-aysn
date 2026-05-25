@@ -17,12 +17,15 @@ MIN_YEAR, MIN_MONTH = 2025, 1
 
 
 async def validate_key(api_key: str) -> bool:
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(
-            f"{WB_BASE}/api/v1/account/balance",
-            headers={"Authorization": api_key},
-        )
-        return resp.status_code == 200
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"{WB_BASE}/api/v1/account/balance",
+                headers={"Authorization": api_key},
+            )
+            return resp.status_code == 200
+    except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError):
+        return False
 
 
 async def sync_reports(key_id: int, api_key: str, date_from: str) -> bool:

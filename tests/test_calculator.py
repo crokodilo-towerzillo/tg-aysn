@@ -2,6 +2,7 @@ import math
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 import db
@@ -122,6 +123,14 @@ async def test_validate_key_returns_false_on_401():
         assert await calculator.validate_key("bad-token") is False
 
 
+async def test_validate_key_returns_false_on_timeout():
+    with patch("httpx.AsyncClient") as MockClient:
+        MockClient.return_value.__aenter__.return_value.get = AsyncMock(
+            side_effect=httpx.TimeoutException("timeout")
+        )
+        assert await calculator.validate_key("any-token") is False
+
+
 # --- sync_reports (mocked httpx) ---
 
 async def test_sync_reports_saves_data(tmp_db):
@@ -158,3 +167,18 @@ async def test_sync_reports_returns_false_on_401(tmp_db):
         MockClient.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_resp)
         result = await calculator.sync_reports(key_id, "tok", "2025-01-01")
     assert result is False
+
+
+async def test_sync_reports_returns_false_on_timeout(tmp_db):
+    key_id = db.add_key(1, "Shop", "tok")
+    with patch("httpx.AsyncClient") as MockClient:
+        MockClient.return_value.__aenter__.return_value.post = AsyncMock(
+            side_effect=httpx.TimeoutException("timeout")
+        )
+        result = await calculator.sync_reports(key_id, "tok", "2025-01-01")
+    assert result is False
+
+
+def test_needs_sync_with_aware_datetime():
+    recent_aware = datetime.now(timezone.utc).isoformat()
+    assert calculator.needs_sync(recent_aware) is False
