@@ -24,10 +24,12 @@ _WELCOME = (
 )
 
 _TOKEN_INSTRUCTION = (
-    "Введите API ключ WB:\n\n"
-    "Создайте токен: ЛК WB → Профиль → Настройки → Доступ к API\n"
-    "Категория: Финансы — тип Персональный или Сервисный\n\n"
-    "⚠️ Выбирайте права только для чтения"
+    "🔑 Введите API-ключ Wildberries\n\n"
+    "1️⃣ Профиль → Интеграции по API\n"
+    "2️⃣ Создать токен → Для интеграции вручную\n"
+    "3️⃣ Персональный токен\n"
+    "4️⃣ Финансы\n"
+    "5️⃣ Только чтение"
 )
 
 
@@ -159,7 +161,7 @@ async def add_key_token(message: Message, state: FSMContext):
 @router.callback_query(F.data == "delete_key")
 async def cb_delete_key_start(call: CallbackQuery):
     keys = db.get_keys(call.message.chat.id)
-    shops = [(k["id"], k["label"]) for k in keys]
+    shops = [(k["id"], k["label"], bool(k["is_valid"])) for k in keys]
     await call.message.edit_text(
         "Выберите магазин для удаления:",
         reply_markup=keyboards.delete_list_keyboard(shops),

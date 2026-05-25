@@ -37,48 +37,51 @@ def main_keyboard(shops: list[tuple[int, str, bool]]) -> InlineKeyboardMarkup:
     for key_id, label, is_valid in shops:
         icon = "🟢" if is_valid else "🔴"
         buttons.append([_btn(f"{icon} {label}", f"calc:{key_id}")])
-    buttons.append([_btn("Добавить ключ", "add_key")])
+    buttons.append([_btn("➕ Добавить ключ", "add_key")])
     if shops:
-        buttons.append([_btn("Удалить ключ", "delete_key")])
+        buttons.append([_btn("🗑 Удалить ключ", "delete_key")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def no_keys_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [_btn("Добавить ключ", "add_key")]
+        [_btn("➕ Добавить ключ", "add_key")]
     ])
 
 
 def period_keyboard(key_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            _btn("Этот месяц", f"period:this:{key_id}"),
-            _btn("Прошлый месяц", f"period:prev:{key_id}"),
+            _btn("📅 Этот месяц", f"period:this:{key_id}"),
+            _btn("📅 Прошлый месяц", f"period:prev:{key_id}"),
         ],
-        [_btn("Свой период", f"period:custom:{key_id}")],
-        [_btn("Главная", "home")],
+        [_btn("✏️ Свой период", f"period:custom:{key_id}")],
+        [_btn("🏠 Главная", "home")],
     ])
 
 
-def delete_list_keyboard(shops: list[tuple[int, str]]) -> InlineKeyboardMarkup:
-    buttons = [[_btn(label, f"delete_select:{key_id}")] for key_id, label in shops]
-    buttons.append([_btn("Отмена", "home")])
+def delete_list_keyboard(shops: list[tuple[int, str, bool]]) -> InlineKeyboardMarkup:
+    buttons = [
+        [_btn(f"{'🟢' if is_valid else '🔴'} {label}", f"delete_select:{key_id}")]
+        for key_id, label, is_valid in shops
+    ]
+    buttons.append([_btn("✖️ Отмена", "home")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def confirm_delete_keyboard(key_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [_btn("Да, удалить", f"delete_confirm:{key_id}"), _btn("Отмена", "home")]
+        [_btn("✅ Да, удалить", f"delete_confirm:{key_id}"), _btn("✖️ Отмена", "home")]
     ])
 
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[_btn("Отмена", "home")]])
+    return InlineKeyboardMarkup(inline_keyboard=[[_btn("✖️ Отмена", "home")]])
 
 
 def result_keyboard(key_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [_btn("Другой период", f"period_again:{key_id}"), _btn("Главная", "home")]
+        [_btn("🔄 Другой период", f"period_again:{key_id}"), _btn("🏠 Главная", "home")]
     ])
 
 
@@ -110,6 +113,6 @@ def custom_to_keyboard(key_id: int, from_y: int, from_m: int, year: int | None =
         _btn("▶️", f"cyt:{key_id}:{from_y}:{from_m}:{next_year}") if next_year else _empty_btn(),
     ]
     rows = [nav] + _month_grid(year, (from_y, from_m), (today.year, today.month), f"ct:{key_id}:{from_y}:{from_m}")
-    rows.append([_btn("← Назад", f"period:custom:{key_id}")])
-    rows.append([_btn("Отмена", "home")])
+    rows.append([_btn("◀️ Назад", f"period:custom:{key_id}")])
+    rows.append([_btn("✖️ Отмена", "home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
