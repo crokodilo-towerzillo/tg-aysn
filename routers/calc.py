@@ -2,7 +2,6 @@ from datetime import date
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 import calculator
@@ -10,10 +9,6 @@ import db
 import keyboards
 
 router = Router()
-
-
-class CalcPeriod(StatesGroup):
-    custom_input = State()
 
 
 def _this_month() -> tuple[tuple[int, int], tuple[int, int]]:
@@ -47,7 +42,7 @@ async def _show_result(
             text = f"За {period_str} отчётов не найдено."
         else:
             tax_fmt = f"{tax:,}".replace(",", " ")
-            text = f"Налог АУСН 8% за {period_str}: {tax_fmt} руб."
+            text = f"Налог АУСН 8% за {period_str}:\n{tax_fmt} руб."
         kb = keyboards.result_keyboard(key_id)
 
     if isinstance(target, CallbackQuery):
@@ -58,9 +53,8 @@ async def _show_result(
 
 
 @router.callback_query(F.data.startswith("calc:"))
-async def cb_calc_select(call: CallbackQuery, state: FSMContext):
+async def cb_calc_select(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
-    await state.update_data(key_id=key_id)
     await call.message.edit_text(
         "Выберите период:", reply_markup=keyboards.period_keyboard(key_id)
     )
@@ -68,9 +62,8 @@ async def cb_calc_select(call: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith("period_again:"))
-async def cb_period_again(call: CallbackQuery, state: FSMContext):
+async def cb_period_again(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
-    await state.update_data(key_id=key_id)
     await call.message.edit_text(
         "Выберите период:", reply_markup=keyboards.period_keyboard(key_id)
     )
@@ -94,25 +87,49 @@ async def cb_period_prev(call: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith("period:custom:"))
-async def cb_period_custom_start(call: CallbackQuery, state: FSMContext):
+async def cb_period_custom_start(call: CallbackQuery):
     key_id = int(call.data.split(":")[2])
-    await state.set_state(CalcPeriod.custom_input)
-    await state.update_data(key_id=key_id)
     await call.message.edit_text(
-        "Введите период в формате MM.YY-MM.YY\nНапример: 01.26-03.26 (январь–март 2026)",
-        reply_markup=keyboards.cancel_keyboard(),
+        "Выберите начало периода:", reply_markup=keyboards.custom_from_keyboard(key_id)
     )
     await call.answer()
 
 
-@router.message(CalcPeriod.custom_input)
-async def custom_period_input(message: Message, state: FSMContext):
-    data = await state.get_data()
-    key_id = data["key_id"]
-    parsed = calculator.parse_period(message.text or "")
-    if isinstance(parsed, str):
-        await message.answer(parsed, reply_markup=keyboards.cancel_keyboard())
-        return
+@router.callback_query(F.data.startswith("cf:"))
+async def cb_custom_from(call: CallbackQuery):
+    _, key_id, y, m = call.data.split(":")
+    key_id, y, m = int(key_id), int(y), int(m)
+    await call.message.edit_text(
+        "Выберите конец периода:", reply_markup=keyboards.custom_to_keyboard(key_id, y, m)
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("ct:"))
+async def cb_custom_to(call: CallbackQuery, state: FSMContext):
+    parts = call.data.split(":")
+    key_id = int(parts[1])
+    from_y, from_m, to_y, to_m = int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5])
     await state.clear()
-    m_from, m_to = parsed
-    await _show_result(message, key_id, m_from, m_to)
+    await _show_result(call, key_id, (from_y, from_m), (to_y, to_m))
+
+
+@router.callback_query(F.data.startswith("cyf:"))
+async def cb_custom_year_from(call: CallbackQuery):
+    parts = call.data.split(":")
+    key_id, year = int(parts[1]), int(parts[2])
+    await call.message.edit_reply_markup(reply_markup=keyboards.custom_from_keyboard(key_id, year))
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("cyt:"))
+async def cb_custom_year_to(call: CallbackQuery):
+    parts = call.data.split(":")
+    key_id, from_y, from_m, year = int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4])
+    await call.message.edit_reply_markup(reply_markup=keyboards.custom_to_keyboard(key_id, from_y, from_m, year))
+    await call.answer()
+
+
+@router.callback_query(F.data == "noop")
+async def cb_noop(call: CallbackQuery):
+    await call.answer()

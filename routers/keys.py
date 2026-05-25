@@ -1,6 +1,7 @@
 import asyncio
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -18,12 +19,18 @@ class AddKey(StatesGroup):
     token = State()
 
 
-def _build_main_screen(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
+_WELCOME = (
+    "Привет! Я считаю налог АУСН «доходы» 8% по вашим продажам на Wildberries.\n\n"
+)
+
+
+def _build_main_screen(user_id: int, welcome: bool = False) -> tuple[str, InlineKeyboardMarkup]:
     keys = db.get_keys(user_id)
+    prefix = _WELCOME if welcome else ""
     if not keys:
-        return "Ваши магазины:", keyboards.no_keys_keyboard()
+        return prefix + "Ваши магазины:", keyboards.no_keys_keyboard()
     shops = [(k["id"], k["label"], bool(k["is_valid"])) for k in keys]
-    return "Ваши магазины:", keyboards.main_keyboard(shops)
+    return prefix + "Ваши магазины:", keyboards.main_keyboard(shops)
 
 
 async def _sync_all(keys: list) -> None:
@@ -36,19 +43,39 @@ async def _sync_all(keys: list) -> None:
     await asyncio.gather(*[_one(k) for k in keys])
 
 
+async def _edit_or_answer(message: Message, bot_msg_id: int | None, text: str, kb=None) -> int:
+    if bot_msg_id:
+        try:
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=bot_msg_id,
+                text=text,
+                reply_markup=kb,
+            )
+            return bot_msg_id
+        except TelegramBadRequest:
+            pass
+    sent = await message.answer(text, reply_markup=kb)
+    return sent.message_id
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
     user_id = message.chat.id
     keys = db.get_keys(user_id)
 
     if keys and any(calculator.needs_sync(k["last_synced_at"]) for k in keys):
         msg = await message.answer("Обновляю данные...")
         await _sync_all(keys)
-        text, kb = _build_main_screen(user_id)
+        text, kb = _build_main_screen(user_id, welcome=True)
         await msg.edit_text(text, reply_markup=kb)
     else:
-        text, kb = _build_main_screen(user_id)
+        text, kb = _build_main_screen(user_id, welcome=True)
         await message.answer(text, reply_markup=kb)
 
 
@@ -63,8 +90,9 @@ async def cb_home(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "add_key")
 async def cb_add_key_start(call: CallbackQuery, state: FSMContext):
     await state.set_state(AddKey.label)
+    await state.update_data(bot_msg_id=call.message.message_id)
     await call.message.edit_text(
-        "Введите метку магазина:", reply_markup=keyboards.cancel_keyboard()
+        "Введите имя магазина:", reply_markup=keyboards.cancel_keyboard()
     )
     await call.answer()
 
@@ -72,39 +100,58 @@ async def cb_add_key_start(call: CallbackQuery, state: FSMContext):
 @router.message(AddKey.label)
 async def add_key_label(message: Message, state: FSMContext):
     label = message.text.strip() if message.text else ""
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+    data = await state.get_data()
+    bot_msg_id = data.get("bot_msg_id")
+
     if not label:
-        await message.answer("Метка не может быть пустой:", reply_markup=keyboards.cancel_keyboard())
+        await _edit_or_answer(
+            message, bot_msg_id,
+            "Имя не может быть пустым. Введите имя магазина:",
+            keyboards.cancel_keyboard(),
+        )
         return
+
     await state.update_data(label=label)
     await state.set_state(AddKey.token)
     text = (
         "Введите API ключ WB:\n\n"
-        "Создайте токен в ЛК WB → Профиль → Настройки → "
-        "Доступ к API → категория Финансы (тип: Персональный или Сервисный)"
+        "Создайте токен: ЛК WB → Профиль → Настройки → Доступ к API\n"
+        "Категория: Финансы — тип Персональный или Сервисный\n\n"
+        "⚠️ Выбирайте права только для чтения"
     )
-    await message.answer(text, reply_markup=keyboards.cancel_keyboard())
+    await _edit_or_answer(message, bot_msg_id, text, keyboards.cancel_keyboard())
 
 
 @router.message(AddKey.token)
 async def add_key_token(message: Message, state: FSMContext):
     api_key = message.text.strip() if message.text else ""
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
     data = await state.get_data()
     label = data["label"]
+    bot_msg_id = data.get("bot_msg_id")
 
     valid = await calculator.validate_key(api_key)
     if not valid:
-        await message.answer(
-            "Ключ недействителен, проверьте тип токена и попробуйте снова:",
-            reply_markup=keyboards.cancel_keyboard(),
+        await _edit_or_answer(
+            message, bot_msg_id,
+            "Ключ недействителен, проверьте тип токена.\n\nВведите API ключ WB:",
+            keyboards.cancel_keyboard(),
         )
         return
 
     key_id = db.add_key(user_id=message.chat.id, label=label, api_key=api_key)
     await state.clear()
-    msg = await message.answer("Загружаю историю отчётов...")
+    effective_id = await _edit_or_answer(message, bot_msg_id, "Загружаю историю отчётов...")
     await calculator.sync_reports(key_id, api_key, "2025-01-01")
     text, kb = _build_main_screen(message.chat.id)
-    await msg.edit_text(f'Магазин "{label}" добавлен 🟢\n\n{text}', reply_markup=kb)
+    await _edit_or_answer(message, effective_id, f'Магазин "{label}" добавлен 🟢\n\n{text}', kb)
 
 
 @router.callback_query(F.data == "delete_key")
