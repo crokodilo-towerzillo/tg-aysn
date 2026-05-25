@@ -40,6 +40,8 @@ def init_db():
                 state TEXT,
                 data  TEXT
             );
+            CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
+            CREATE INDEX IF NOT EXISTS idx_reports_key_date ON reports(key_id, date_to);
         """)
 
 

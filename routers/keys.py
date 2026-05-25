@@ -207,6 +207,16 @@ async def cb_delete_select(call: CallbackQuery):
     await call.answer()
 
 
+@router.message()
+async def fallback_message(message: Message):
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+    text, kb = _build_main_screen(message.chat.id)
+    await message.answer(text, reply_markup=kb)
+
+
 @router.callback_query(F.data.startswith("delete_confirm:"))
 async def cb_delete_confirm(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
