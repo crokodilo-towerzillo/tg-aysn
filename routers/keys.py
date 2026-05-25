@@ -23,6 +23,13 @@ _WELCOME = (
     "Привет! Я считаю налог АУСН «доходы» 8% по вашим продажам на Wildberries.\n\n"
 )
 
+_TOKEN_INSTRUCTION = (
+    "Введите API ключ WB:\n\n"
+    "Создайте токен: ЛК WB → Профиль → Настройки → Доступ к API\n"
+    "Категория: Финансы — тип Персональный или Сервисный\n\n"
+    "⚠️ Выбирайте права только для чтения"
+)
+
 
 def _build_main_screen(user_id: int, welcome: bool = False) -> tuple[str, InlineKeyboardMarkup]:
     keys = db.get_keys(user_id)
@@ -53,8 +60,9 @@ async def _edit_or_answer(message: Message, bot_msg_id: int | None, text: str, k
                 reply_markup=kb,
             )
             return bot_msg_id
-        except TelegramBadRequest:
-            pass
+        except TelegramBadRequest as e:
+            if "not modified" in e.message.lower():
+                return bot_msg_id
     sent = await message.answer(text, reply_markup=kb)
     return sent.message_id
 
@@ -117,13 +125,7 @@ async def add_key_label(message: Message, state: FSMContext):
 
     await state.update_data(label=label)
     await state.set_state(AddKey.token)
-    text = (
-        "Введите API ключ WB:\n\n"
-        "Создайте токен: ЛК WB → Профиль → Настройки → Доступ к API\n"
-        "Категория: Финансы — тип Персональный или Сервисный\n\n"
-        "⚠️ Выбирайте права только для чтения"
-    )
-    await _edit_or_answer(message, bot_msg_id, text, keyboards.cancel_keyboard())
+    await _edit_or_answer(message, bot_msg_id, _TOKEN_INSTRUCTION, keyboards.cancel_keyboard())
 
 
 @router.message(AddKey.token)
@@ -141,7 +143,7 @@ async def add_key_token(message: Message, state: FSMContext):
     if not valid:
         await _edit_or_answer(
             message, bot_msg_id,
-            "Ключ недействителен, проверьте тип токена.\n\nВведите API ключ WB:",
+            _TOKEN_INSTRUCTION + "\n\n❌ Ключ недействителен, проверьте тип токена",
             keyboards.cancel_keyboard(),
         )
         return

@@ -25,7 +25,7 @@ async def validate_key(api_key: str) -> bool:
                 headers={"Authorization": api_key},
             )
             return resp.status_code == 200
-    except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError):
+    except Exception:
         return False
 
 
