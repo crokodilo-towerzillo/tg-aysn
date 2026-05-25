@@ -146,7 +146,10 @@ async def cb_delete_select(call: CallbackQuery):
 async def cb_delete_confirm(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
     row = db.get_key(key_id)
-    label = row["label"] if row else "Магазин"
+    if row is None or row["user_id"] != call.message.chat.id:
+        await call.answer("Магазин не найден")
+        return
+    label = row["label"]
     db.delete_key(key_id)
     text, kb = await _build_main_screen(call.message.chat.id)
     await call.message.edit_text(f'Магазин "{label}" удалён.\n\n{text}', reply_markup=kb)

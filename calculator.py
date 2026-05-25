@@ -1,5 +1,6 @@
 import math
 import re
+import sqlite3
 from datetime import date, datetime, timezone
 
 import httpx
@@ -41,9 +42,9 @@ async def sync_reports(key_id: int, api_key: str, date_from: str) -> bool:
             if resp.status_code == 401:
                 return False
             resp.raise_for_status()
+            if db.get_key(key_id) is None:
+                return True
             for item in resp.json():
-                if db.get_key(key_id) is None:
-                    return True
                 db.upsert_report(
                     key_id=key_id,
                     report_id=item["realizationreportId"],
@@ -54,7 +55,7 @@ async def sync_reports(key_id: int, api_key: str, date_from: str) -> bool:
                 )
             db.update_last_synced(key_id)
             return True
-    except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError):
+    except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError, sqlite3.IntegrityError):
         return False
 
 
@@ -83,6 +84,9 @@ def parse_period(text: str) -> tuple[tuple[int, int], tuple[int, int]] | str:
         return "Данные доступны с января 2025 года"
     if (y1, mm1) > (y2, mm2):
         return "Конец периода не может быть раньше начала"
+    today = date.today()
+    if (y2, mm2) > (today.year, today.month):
+        return "Конец периода не может быть в будущем"
     return (y1, mm1), (y2, mm2)
 
 

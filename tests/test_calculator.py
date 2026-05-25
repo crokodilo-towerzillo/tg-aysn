@@ -75,6 +75,12 @@ def test_parse_period_start_before_2025_returns_string():
     assert "2025" in result
 
 
+def test_parse_period_future_end_returns_string():
+    result = calculator.parse_period("01.25-12.99")
+    assert isinstance(result, str)
+    assert "будущем" in result
+
+
 # --- format_period ---
 
 def test_format_period_single_month():
