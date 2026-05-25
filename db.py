@@ -35,6 +35,11 @@ def init_db():
                 retail_amount_sum REAL    NOT NULL,
                 UNIQUE(key_id, report_id)
             );
+            CREATE TABLE IF NOT EXISTS fsm_state (
+                key   TEXT PRIMARY KEY,
+                state TEXT,
+                data  TEXT
+            );
         """)
 
 
@@ -106,6 +111,36 @@ def upsert_report(
             """,
             (key_id, report_id, date_from, date_to, report_type, retail_amount_sum),
         )
+
+
+def fsm_set_state(key: str, state: str | None) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO fsm_state(key, state) VALUES (?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET state=excluded.state",
+            (key, state),
+        )
+
+
+def fsm_get_state(key: str) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT state FROM fsm_state WHERE key=?", (key,)).fetchone()
+        return row["state"] if row else None
+
+
+def fsm_set_data(key: str, data_json: str) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO fsm_state(key, data) VALUES (?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET data=excluded.data",
+            (key, data_json),
+        )
+
+
+def fsm_get_data(key: str) -> str | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT data FROM fsm_state WHERE key=?", (key,)).fetchone()
+        return row["data"] if row else None
 
 
 def get_reports_for_period(

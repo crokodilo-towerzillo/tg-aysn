@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
@@ -19,16 +18,11 @@ class AddKey(StatesGroup):
     token = State()
 
 
-async def _build_main_screen(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
+def _build_main_screen(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
     keys = db.get_keys(user_id)
     if not keys:
         return "Ваши магазины:", keyboards.no_keys_keyboard()
-    statuses = await asyncio.gather(
-        *[calculator.validate_key(db.decrypt_key(k)) for k in keys]
-    )
-    for key, is_valid in zip(keys, statuses):
-        db.update_key_validity(key["id"], is_valid)
-    shops = [(k["id"], k["label"], ok) for k, ok in zip(keys, statuses)]
+    shops = [(k["id"], k["label"], bool(k["is_valid"])) for k in keys]
     return "Ваши магазины:", keyboards.main_keyboard(shops)
 
 
@@ -37,11 +31,7 @@ async def _sync_all(keys: list) -> None:
         if not calculator.needs_sync(key_row["last_synced_at"]):
             return
         api_key = db.decrypt_key(key_row)
-        ls = key_row["last_synced_at"]
-        date_from = (
-            datetime.fromisoformat(ls).strftime("%Y-%m-%d") if ls else "2025-01-01"
-        )
-        await calculator.sync_reports(key_row["id"], api_key, date_from)
+        await calculator.sync_reports(key_row["id"], api_key, "2025-01-01")
 
     await asyncio.gather(*[_one(k) for k in keys])
 
@@ -55,17 +45,17 @@ async def cmd_start(message: Message, state: FSMContext):
     if keys and any(calculator.needs_sync(k["last_synced_at"]) for k in keys):
         msg = await message.answer("Обновляю данные...")
         await _sync_all(keys)
-        text, kb = await _build_main_screen(user_id)
+        text, kb = _build_main_screen(user_id)
         await msg.edit_text(text, reply_markup=kb)
     else:
-        text, kb = await _build_main_screen(user_id)
+        text, kb = _build_main_screen(user_id)
         await message.answer(text, reply_markup=kb)
 
 
 @router.callback_query(F.data == "home")
 async def cb_home(call: CallbackQuery, state: FSMContext):
     await state.clear()
-    text, kb = await _build_main_screen(call.message.chat.id)
+    text, kb = _build_main_screen(call.message.chat.id)
     await call.message.edit_text(text, reply_markup=kb)
     await call.answer()
 
@@ -113,7 +103,7 @@ async def add_key_token(message: Message, state: FSMContext):
     await state.clear()
     msg = await message.answer("Загружаю историю отчётов...")
     await calculator.sync_reports(key_id, api_key, "2025-01-01")
-    text, kb = await _build_main_screen(message.chat.id)
+    text, kb = _build_main_screen(message.chat.id)
     await msg.edit_text(f'Магазин "{label}" добавлен 🟢\n\n{text}', reply_markup=kb)
 
 
@@ -151,6 +141,6 @@ async def cb_delete_confirm(call: CallbackQuery):
         return
     label = row["label"]
     db.delete_key(key_id)
-    text, kb = await _build_main_screen(call.message.chat.id)
+    text, kb = _build_main_screen(call.message.chat.id)
     await call.message.edit_text(f'Магазин "{label}" удалён.\n\n{text}', reply_markup=kb)
     await call.answer()

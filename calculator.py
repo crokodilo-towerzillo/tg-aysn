@@ -40,6 +40,10 @@ async def sync_reports(key_id: int, api_key: str, date_from: str) -> bool:
                 json={"dateFrom": date_from, "dateTo": date_to},
             )
             if resp.status_code == 401:
+                db.update_key_validity(key_id, False)
+                return False
+            if resp.status_code == 429:
+                db.update_last_synced(key_id)
                 return False
             resp.raise_for_status()
             if db.get_key(key_id) is None:
@@ -47,13 +51,14 @@ async def sync_reports(key_id: int, api_key: str, date_from: str) -> bool:
             for item in resp.json():
                 db.upsert_report(
                     key_id=key_id,
-                    report_id=item["realizationreportId"],
+                    report_id=item["reportId"],
                     date_from=item["dateFrom"],
-                    date_to=item["rr_dt"],
+                    date_to=item["dateTo"],
                     report_type=item["reportType"],
                     retail_amount_sum=float(item["retailAmountSum"]),
                 )
             db.update_last_synced(key_id)
+            db.update_key_validity(key_id, True)
             return True
     except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError, sqlite3.IntegrityError):
         return False
