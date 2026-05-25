@@ -34,7 +34,7 @@ async def _show_result(
         text = "Магазин не найден."
         kb = keyboards.cancel_keyboard()
     elif not row["is_valid"]:
-        text = "Ключ недействителен, обновите его."
+        text = "Ключ недействителен. Удалите магазин и добавьте заново."
         kb = keyboards.result_keyboard(key_id)
     else:
         tax = calculator.calculate_tax(key_id, month_from, month_to)

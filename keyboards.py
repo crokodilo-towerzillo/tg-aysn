@@ -113,6 +113,6 @@ def custom_to_keyboard(key_id: int, from_y: int, from_m: int, year: int | None =
         _btn("▶️", f"cyt:{key_id}:{from_y}:{from_m}:{next_year}") if next_year else _empty_btn(),
     ]
     rows = [nav] + _month_grid(year, (from_y, from_m), (today.year, today.month), f"ct:{key_id}:{from_y}:{from_m}")
-    rows.append([_btn("◀️ Назад", f"period:custom:{key_id}")])
+    rows.append([_btn("◀️ Назад", f"calc:{key_id}")])
     rows.append([_btn("✖️ Отмена", "home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

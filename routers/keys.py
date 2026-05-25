@@ -99,6 +99,13 @@ async def cb_home(call: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "add_key")
 async def cb_add_key_start(call: CallbackQuery, state: FSMContext):
+    if len(db.get_keys(call.message.chat.id)) >= 15:
+        await call.message.edit_text(
+            "Достигнут лимит 15 магазинов. Удалите один, чтобы добавить новый.",
+            reply_markup=keyboards.cancel_keyboard(),
+        )
+        await call.answer()
+        return
     await state.set_state(AddKey.label)
     await state.update_data(bot_msg_id=call.message.message_id)
     await call.message.edit_text(
@@ -121,6 +128,23 @@ async def add_key_label(message: Message, state: FSMContext):
         await _edit_or_answer(
             message, bot_msg_id,
             "Имя не может быть пустым. Введите имя магазина:",
+            keyboards.cancel_keyboard(),
+        )
+        return
+
+    if len(label) > 100:
+        await _edit_or_answer(
+            message, bot_msg_id,
+            "Имя слишком длинное (максимум 100 символов). Введите имя магазина:",
+            keyboards.cancel_keyboard(),
+        )
+        return
+
+    existing = db.get_keys(message.chat.id)
+    if any(k["label"] == label for k in existing):
+        await _edit_or_answer(
+            message, bot_msg_id,
+            f'Имя "{label}" уже занято. Введите другое:',
             keyboards.cancel_keyboard(),
         )
         return
