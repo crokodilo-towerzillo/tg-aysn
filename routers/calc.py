@@ -63,6 +63,14 @@ async def cb_calc_select(call: CallbackQuery):
     if calculator.needs_sync(row["last_synced_at"]):
         await call.message.edit_text("Обновляю данные...")
         await calculator.sync_reports(key_id, db.decrypt_key(row), "2025-01-01")
+        row = db.get_key(key_id, user_id=call.message.chat.id)
+    if not row["is_valid"]:
+        await call.message.edit_text(
+            "Ключ недействителен. Удалите магазин и добавьте заново.",
+            reply_markup=keyboards.cancel_keyboard(),
+        )
+        await call.answer()
+        return
     await call.message.edit_text(
         "Выберите период:", reply_markup=keyboards.period_keyboard(key_id)
     )
