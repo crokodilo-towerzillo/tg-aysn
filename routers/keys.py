@@ -71,11 +71,20 @@ async def _edit_or_answer(message: Message, bot_msg_id: int | None, text: str, k
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
+    data = await state.get_data()
+    last_bot_msg_id = data.get("bot_msg_id")
     await state.clear()
+
     try:
         await message.delete()
     except TelegramBadRequest:
         pass
+    if last_bot_msg_id:
+        try:
+            await message.bot.delete_message(message.chat.id, last_bot_msg_id)
+        except TelegramBadRequest:
+            pass
+
     user_id = message.chat.id
     keys = db.get_keys(user_id)
 
@@ -85,8 +94,8 @@ async def cmd_start(message: Message, state: FSMContext):
         text, kb = _build_main_screen(user_id, welcome=True)
         await msg.edit_text(text, reply_markup=kb)
     else:
-        text, kb = _build_main_screen(user_id, welcome=True)
-        await message.answer(text, reply_markup=kb)
+        msg = await message.answer(*_build_main_screen(user_id, welcome=True))
+    await state.update_data(bot_msg_id=msg.message_id)
 
 
 @router.callback_query(F.data == "home")
@@ -94,6 +103,7 @@ async def cb_home(call: CallbackQuery, state: FSMContext):
     await state.clear()
     text, kb = _build_main_screen(call.message.chat.id)
     await call.message.edit_text(text, reply_markup=kb)
+    await state.update_data(bot_msg_id=call.message.message_id)
     await call.answer()
 
 
@@ -179,7 +189,8 @@ async def add_key_token(message: Message, state: FSMContext):
     effective_id = await _edit_or_answer(message, bot_msg_id, "Загружаю историю отчётов...")
     await calculator.sync_reports(key_id, api_key, "2025-01-01")
     text, kb = _build_main_screen(message.chat.id)
-    await _edit_or_answer(message, effective_id, f'Магазин "{label}" добавлен 🟢\n\n{text}', kb)
+    effective_id = await _edit_or_answer(message, effective_id, f'Магазин "{label}" добавлен 🟢\n\n{text}', kb)
+    await state.update_data(bot_msg_id=effective_id)
 
 
 @router.callback_query(F.data == "delete_key")
@@ -208,13 +219,13 @@ async def cb_delete_select(call: CallbackQuery):
 
 
 @router.message()
-async def fallback_message(message: Message):
+async def fallback_message(message: Message, state: FSMContext):
     try:
         await message.delete()
     except TelegramBadRequest:
         pass
-    text, kb = _build_main_screen(message.chat.id)
-    await message.answer(text, reply_markup=kb)
+    msg = await message.answer(*_build_main_screen(message.chat.id))
+    await state.update_data(bot_msg_id=msg.message_id)
 
 
 @router.callback_query(F.data.startswith("delete_confirm:"))
