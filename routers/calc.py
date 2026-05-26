@@ -56,9 +56,13 @@ async def _show_result(
 @router.callback_query(F.data.startswith("calc:"))
 async def cb_calc_select(call: CallbackQuery):
     key_id = int(call.data.split(":")[1])
-    if db.get_key(key_id, user_id=call.message.chat.id) is None:
+    row = db.get_key(key_id, user_id=call.message.chat.id)
+    if row is None:
         await call.answer("Магазин не найден", show_alert=True)
         return
+    if calculator.needs_sync(row["last_synced_at"]):
+        await call.message.edit_text("Обновляю данные...")
+        await calculator.sync_reports(key_id, db.decrypt_key(row), "2025-01-01")
     await call.message.edit_text(
         "Выберите период:", reply_markup=keyboards.period_keyboard(key_id)
     )
